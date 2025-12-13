@@ -1,0 +1,34 @@
+{
+    // Use o IntelliSense para saber mais sobre os atributos possíveis.
+    // Focalizar para exibir as descrições dos atributos existentes.
+    // Para obter mais informações, acesse: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug executable 'ecompiler'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=ecompiler"
+                ]
+            },
+            "args": [
+                "--path",
+                "./teste.por"
+            ]
+        },
+        {
+            "name": "Debug unit tests in executable 'ecompiler'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=ecompiler"
+                ]
+            }
+        }
+    ]
+}

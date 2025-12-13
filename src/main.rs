@@ -1,0 +1,49 @@
+use std::fs::File;
+use std::io::{BufReader};
+use std::process;
+use clap::Parser;
+
+mod lexical;
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    path: Option<String>,
+}
+
+fn main() {
+    let path = get_source_code_path();
+    let mut source_code_reader = open_source_code_file(&path);
+
+    println!("Iniciando análise léxica . . .");
+    lexical::lexer(&mut source_code_reader);
+}
+
+fn get_source_code_path() -> String {
+    let args = Args::parse();
+
+    match args.path {
+        Some(p) => return p,
+        None => {
+            eprintln!("É necessário passar o diretório do arquivo do código fonte");
+            eprintln!("Exemplo: --path \"./teste.por\"");
+            process::exit(1);
+        },
+    }
+}
+
+fn open_source_code_file(path: &str) -> BufReader<File> {
+
+    let file = File::open(path);
+
+    match file {
+        Ok (content) => {
+            return BufReader::new(content);
+        }
+        Err(err) => {
+            eprintln!("Erro ao ler arquivo!\nArquivo não encontrado em {}\nA extensão do arquivo esperado é '.por'\nMais detalhes: {}", path, err);
+            process::exit(1);
+        }
+    }
+}
