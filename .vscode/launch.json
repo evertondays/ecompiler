@@ -16,7 +16,7 @@
             },
             "args": [
                 "--path",
-                "./teste.por"
+                "./teste.e"
             ]
         },
         {
