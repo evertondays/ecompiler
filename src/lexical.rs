@@ -1,7 +1,8 @@
 use std::fs::File;
-use std::io::{BufReader};
+use std::io::{BufReader, Write};
 use std::io::BufRead;
 use std::process;
+use std::fs;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -44,8 +45,12 @@ pub fn get_tokens(source_code_content: &mut BufReader<File>) {
                 process::exit(1);
             }
         }
+
+        insert_end_line_token(&mut tokens, line_number);
         line_number += 1;
     }
+
+    write_tokens_to_file(&tokens);
 }
 
 fn read_line(
@@ -61,48 +66,61 @@ fn read_line(
 
     for i in 0..chars.len() {
         let c: char = chars[i];
+        let is_last_char = i == chars.len() - 1;
 
         /* != and == especial case */
-        if (c == '!' && chars[i+1] == '=') || (c == '=' && chars[i+1] == '=') {
+        if !is_last_char && (((c == '!' && chars[i+1] == '=') || (c == '=' && chars[i+1] == '='))) {
             flush_token(word, tokens, tokens_table, *line_number, i);
             word.push(c);
             continue;
         }
         
         if c == ' ' {
-            // flush_token();
+            flush_token(word, tokens, tokens_table, *line_number, i);
             continue;
         }
 
         if terminal_characters.contains(&c) {
-            // flush_token();
+            flush_token(word, tokens, tokens_table, *line_number, i);
             word.push(c);
-            // flush_token();
+            flush_token(word, tokens, tokens_table, *line_number, i);
             continue;
         }
 
         word.push(c);
+        flush_token(word, tokens, tokens_table, *line_number, i);
     }
 }
 
 fn flush_token(word: &mut String, tokens: &mut Vec<Token>, tokens_table: &HashMap<String,String>, line_number: i32, column_number: usize) {
-    if !word.is_empty() {
-        let token = match tokens_table.get(word) {
-            Some(token) => token.clone(),
-            None => "UNKNOWN".to_string(),
-        };
-
-        let new_token = Token::new(
-            token,
-            None,
-            line_number,
-            column_number as i32 + 1,
-        );
-
-        tokens.push(new_token);
+    if word.is_empty() {
+        return;
     }
-    
+
+    let token = match tokens_table.get(word) {
+        Some(token) => token.clone(),
+        None => "UNKNOWN".to_string(),
+    };
+
+    let new_token = Token::new(
+        token,
+        None,
+        line_number,
+        column_number as i32 + 1,
+    );
+
+    tokens.push(new_token);
     word.clear();
+}
+
+fn insert_end_line_token(tokens: &mut Vec<Token>, line_number: i32) {
+    let new_token = Token::new(
+        String::from("END_LINE"),
+        None,   
+        line_number,
+        0,
+    );
+    tokens.push(new_token);
 }
 
 fn initialize_tokens_hashmap() -> HashMap<String,String> {
@@ -146,4 +164,32 @@ fn initialize_terminal_characters() -> HashSet<char> {
     terminal_characters.insert('}');
 
     return terminal_characters;
+}
+
+fn write_tokens_to_file(tokens: &Vec<Token>) {
+    let path = "build/lexical.txt";
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).expect("Erro ao criar diretório de build!");
+        }
+    }
+
+    let mut file = File::create(path).expect("Erro ao criar arquivo de saída do lexer");
+
+    for item in tokens {
+        if item.token == "END_LINE" {
+            writeln!(file)
+                .expect("Não foi possível escrever quebra de linha");
+            continue;
+        }
+
+        write!(
+            file,
+            "{}({}:{})",
+            item.token,
+            item.line,
+            item.column
+        )
+        .expect("Não foi possível escrever saída do lexer");
+    }
 }
