@@ -16,7 +16,7 @@
             },
             "args": [
                 "--path",
-                "./teste.e"
+                "./source_code.e"
             ]
         },
         {

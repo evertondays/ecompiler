@@ -26,7 +26,7 @@ fn get_source_code_path() -> String {
     match args.path {
         Some(p) => return p,
         None => {
-            eprintln!("É necessário passar o diretório do arquivo do código fonte");
+            eprintln!("É necessário passar o diretório do arquivo de código fonte");
             eprintln!("Exemplo: --path \"./teste.e\"");
             process::exit(1);
         },

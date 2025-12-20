@@ -53,6 +53,7 @@ pub fn get_tokens(source_code_content: &mut BufReader<File>) {
     write_tokens_to_file(&tokens);
 }
 
+// TODO adicionar ILLEGAL e IDENT
 fn read_line(
     line: &String,
     tokens: &mut Vec<Token>,
@@ -62,16 +63,20 @@ fn read_line(
     terminal_characters: &HashSet<char>,
 
 ) {
-    let chars: Vec<char> = line.chars().collect();
+    let mut chars = line.chars().peekable();
+    let mut i: usize = 0;
 
-    for i in 0..chars.len() {
-        let c: char = chars[i];
-        let is_last_char = i == chars.len() - 1;
-
+    while let Some(c) = chars.next() {
+        i += 1;
         /* != and == especial case */
-        if !is_last_char && (((c == '!' && chars[i+1] == '=') || (c == '=' && chars[i+1] == '='))) {
+        if (c == '!' || c == '=') && let Some('=') = chars.peek() {
             flush_token(word, tokens, tokens_table, *line_number, i);
+
             word.push(c);
+            word.push('=');
+
+            flush_token(word, tokens, tokens_table, *line_number, i);
+            chars.next();
             continue;
         }
         
@@ -87,9 +92,11 @@ fn read_line(
             continue;
         }
 
+        chars.next();
         word.push(c);
-        flush_token(word, tokens, tokens_table, *line_number, i);
     }
+
+    flush_token(word, tokens, tokens_table, *line_number, i);
 }
 
 fn flush_token(word: &mut String, tokens: &mut Vec<Token>, tokens_table: &HashMap<String,String>, line_number: i32, column_number: usize) {
@@ -99,7 +106,7 @@ fn flush_token(word: &mut String, tokens: &mut Vec<Token>, tokens_table: &HashMa
 
     let token = match tokens_table.get(word) {
         Some(token) => token.clone(),
-        None => "UNKNOWN".to_string(),
+        None => "ILLEGAL".to_string(),
     };
 
     let new_token = Token::new(
