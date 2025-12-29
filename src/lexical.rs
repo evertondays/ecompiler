@@ -24,6 +24,40 @@ lazy_static! {
         digits.insert('9');
         digits
     };
+
+    static ref TOKENS_TABLE: HashMap<String, String> = {
+        let mut tokens_table = HashMap::new();
+        tokens_table.insert(String::from(":"), String::from("COLON"));
+        tokens_table.insert(String::from("="), String::from("ASSIGN"));
+        tokens_table.insert(String::from("+"), String::from("PLUS"));
+        tokens_table.insert(String::from("-"), String::from("MINUS"));
+        tokens_table.insert(String::from("*"), String::from("ASTERISK"));
+        tokens_table.insert(String::from("/"), String::from("DIVIDE"));
+        tokens_table.insert(String::from("!"), String::from("BANG"));
+        tokens_table.insert(String::from("=="), String::from("EQUAL"));
+        tokens_table.insert(String::from("!="), String::from("DIFFERENT"));
+        tokens_table.insert(String::from("("), String::from("LPAREN"));
+        tokens_table.insert(String::from(")"), String::from("RPAREN"));
+        tokens_table.insert(String::from("{"), String::from("LBRACE"));
+        tokens_table.insert(String::from("}"), String::from("RBRACE"));
+        tokens_table
+    };
+
+    static ref TERMINAL_CHARACTERS: HashSet<char> = {
+        let mut terminal_characters = HashSet::new();
+        terminal_characters.insert(':');
+        terminal_characters.insert('=');
+        terminal_characters.insert('+');
+        terminal_characters.insert('-');
+        terminal_characters.insert('*');
+        terminal_characters.insert('/');
+        terminal_characters.insert('!');
+        terminal_characters.insert('(');
+        terminal_characters.insert(')');
+        terminal_characters.insert('{');
+        terminal_characters.insert('}');
+        terminal_characters
+    };
 }
 
 pub struct Token {
@@ -53,13 +87,11 @@ pub fn get_tokens(source_code_content: &mut BufReader<File>) {
     let mut tokens: Vec<Token> = Vec::new();
     let mut word: String = String::new();
 
-    let tokens_table: HashMap<String,String> = initialize_tokens_hashmap();
-    let terminal_characters: HashSet<char> = initialize_terminal_characters();
     let mut line_number: i32 = 1;
     
     for line in source_code_content.lines() {
         match line {
-            Ok(content) => read_line(&content, &mut tokens, &mut word, &line_number, &tokens_table, &terminal_characters),
+            Ok(content) => read_line(&content, &mut tokens, &mut word, &line_number),
             Err(err) => {
                 eprintln!("Erro ao ler linha {}: {}", line_number, err);
                 process::exit(1);
@@ -79,9 +111,6 @@ fn read_line(
     tokens: &mut Vec<Token>,
     word: &mut String,
     line_number: &i32,
-    tokens_table: &HashMap<String,String>,
-    terminal_characters: &HashSet<char>,
-
 ) {
     let mut chars = line.chars().peekable();
     let mut i: usize = 0;
@@ -90,31 +119,31 @@ fn read_line(
         i += 1;
         /* != and == especial case */
         if (c == '!' || c == '=') && let Some('=') = chars.peek() {
-            flush_token(word, tokens, tokens_table, *line_number, i);
+            flush_token(word, tokens, *line_number, i);
 
             word.push(c);
             word.push('=');
 
-            flush_token(word, tokens, tokens_table, *line_number, i);
+            flush_token(word, tokens, *line_number, i);
             chars.next();
             continue;
         }
         
         if c == ' ' {
-            flush_token(word, tokens, tokens_table, *line_number, i);
+            flush_token(word, tokens, *line_number, i);
             continue;
         }
 
-        if terminal_characters.contains(&c) {
-            flush_token(word, tokens, tokens_table, *line_number, i);
+        if TERMINAL_CHARACTERS.contains(&c) {
+            flush_token(word, tokens, *line_number, i);
             word.push(c);
-            flush_token(word, tokens, tokens_table, *line_number, i);
+            flush_token(word, tokens, *line_number, i);
             continue;
         }
 
         if is_number(&c) {
             let mut number_value = String::new();
-            compute_numbers(c, &mut chars, &mut number_value, tokens, tokens_table, *line_number, i);
+            compute_numbers(c, &mut chars, &mut number_value, tokens, *line_number, i);
             continue;
         }
 
@@ -122,15 +151,15 @@ fn read_line(
         word.push(c);
     }
 
-    flush_token(word, tokens, tokens_table, *line_number, i);
+    flush_token(word, tokens, *line_number, i);
 }
 
-fn flush_token(word: &mut String, tokens: &mut Vec<Token>, tokens_table: &HashMap<String,String>, line_number: i32, column_number: usize) {
+fn flush_token(word: &mut String, tokens: &mut Vec<Token>, line_number: i32, column_number: usize) {
     if word.is_empty() {
         return;
     }
 
-    let token = match tokens_table.get(word) {
+    let token = match TOKENS_TABLE.get(word) {
         Some(token) => token.clone(),
         None => "ILLEGAL".to_string(),
     };
@@ -153,7 +182,6 @@ fn compute_numbers(
     chars: &mut Peekable<Chars>,
     value: &mut String,
     tokens: &mut Vec<Token>,
-    tokens_table: &HashMap<String, String>,
     line_number: i32,
     column_number: usize,
 ) {
@@ -164,7 +192,7 @@ fn compute_numbers(
 
     // The current word is not a number anymore
     if !is_number(&c) {
-        flush_token(value, tokens, tokens_table, line_number, column_number);
+        flush_token(value, tokens, line_number, column_number);
         return;
     }
 
@@ -172,9 +200,9 @@ fn compute_numbers(
     
     // Consume next character if it's a digit
     if let Some(next_char) = chars.next() {
-        compute_numbers(next_char, chars, value, tokens, tokens_table, line_number, column_number);
+        compute_numbers(next_char, chars, value, tokens, line_number, column_number);
     } else {
-        flush_token(value, tokens, tokens_table, line_number, column_number);
+        flush_token(value, tokens, line_number, column_number);
     }
 }
 
@@ -188,48 +216,7 @@ fn insert_end_line_token(tokens: &mut Vec<Token>, line_number: i32) {
     tokens.push(new_token);
 }
 
-fn initialize_tokens_hashmap() -> HashMap<String,String> {
-    let mut tokens_table: HashMap<String,String> = HashMap::new();
 
-    tokens_table.insert(String::from(":"), String::from("COLON"));
-    tokens_table.insert(String::from("="), String::from("ASSIGN"));
-
-    tokens_table.insert(String::from("+"), String::from("PLUS"));
-    tokens_table.insert(String::from("-"), String::from("MINUS"));
-    tokens_table.insert(String::from("*"), String::from("ASTERISK"));
-    tokens_table.insert(String::from("/"), String::from("DIVIDE"));
-    tokens_table.insert(String::from("!"), String::from("BANG"));
-
-    tokens_table.insert(String::from("=="), String::from("EQUAL"));
-    tokens_table.insert(String::from("!="), String::from("DIFFERENT"));
-
-    tokens_table.insert(String::from("("), String::from("LPAREN"));
-    tokens_table.insert(String::from(")"), String::from("RPAREN"));
-    tokens_table.insert(String::from("{"), String::from("LBRACE"));
-    tokens_table.insert(String::from("}"), String::from("RBRACE"));
-
-    return tokens_table;
-}
-
-fn initialize_terminal_characters() -> HashSet<char> {
-    let mut terminal_characters: HashSet<char> = HashSet::new();
-
-    terminal_characters.insert(':');
-    terminal_characters.insert('=');
-
-    terminal_characters.insert('+');
-    terminal_characters.insert('-');
-    terminal_characters.insert('*');
-    terminal_characters.insert('/');
-    terminal_characters.insert('!');
-
-    terminal_characters.insert('(');
-    terminal_characters.insert(')');
-    terminal_characters.insert('{');
-    terminal_characters.insert('}');
-
-    return terminal_characters;
-}
 
 fn write_tokens_to_file(tokens: &Vec<Token>) {
     let path = "build/lexical.txt";
