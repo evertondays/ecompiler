@@ -5,6 +5,26 @@ use std::process;
 use std::fs;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::str::Chars;
+use std::iter::Peekable;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref DIGITS: HashSet<char> = {
+        let mut digits = HashSet::new();
+        digits.insert('0');
+        digits.insert('1');
+        digits.insert('2');
+        digits.insert('3');
+        digits.insert('4');
+        digits.insert('5');
+        digits.insert('6');
+        digits.insert('7');
+        digits.insert('8');
+        digits.insert('9');
+        digits
+    };
+}
 
 pub struct Token {
     pub token: String,
@@ -92,6 +112,12 @@ fn read_line(
             continue;
         }
 
+        if is_number(&c) {
+            let mut number_value = String::new();
+            compute_numbers(c, &mut chars, &mut number_value, tokens, tokens_table, *line_number, i);
+            continue;
+        }
+
         chars.next();
         word.push(c);
     }
@@ -118,6 +144,38 @@ fn flush_token(word: &mut String, tokens: &mut Vec<Token>, tokens_table: &HashMa
 
     tokens.push(new_token);
     word.clear();
+}
+
+
+
+fn compute_numbers(
+    c: char,
+    chars: &mut Peekable<Chars>,
+    value: &mut String,
+    tokens: &mut Vec<Token>,
+    tokens_table: &HashMap<String, String>,
+    line_number: i32,
+    column_number: usize,
+) {
+    // The current word is not a number
+    if !is_number(&c) && value.is_empty() {
+        return;
+    }
+
+    // The current word is not a number anymore
+    if !is_number(&c) {
+        flush_token(value, tokens, tokens_table, line_number, column_number);
+        return;
+    }
+
+    value.push(c);
+    
+    // Consume next character if it's a digit
+    if let Some(next_char) = chars.next() {
+        compute_numbers(next_char, chars, value, tokens, tokens_table, line_number, column_number);
+    } else {
+        flush_token(value, tokens, tokens_table, line_number, column_number);
+    }
 }
 
 fn insert_end_line_token(tokens: &mut Vec<Token>, line_number: i32) {
@@ -199,4 +257,9 @@ fn write_tokens_to_file(tokens: &Vec<Token>) {
         )
         .expect("Não foi possível escrever saída do lexer");
     }
+}
+
+// Useful functions 
+fn is_number(c: &char) -> bool {
+    DIGITS.contains(c)
 }
