@@ -112,40 +112,69 @@ fn read_line(
     word: &mut String,
     line_number: &i32,
 ) {
+    let mut state: i8 = 0;
+
+    // 0 - New token (null)
+    // 1 - String
+    // 2 - Number
+    // 3 - Word (variables or keywords)
+
     let mut chars = line.chars().peekable();
     let mut i: usize = 0;
 
-    while let Some(c) = chars.next() {
+    while let Some(c) = chars.peek() {
         i += 1;
 
-        /* != and == especial case */
-        if (c == '!' || c == '=') && let Some('=') = chars.peek() {
-            flush_token(word, tokens, *line_number, i);
-
-            word.push(c);
-            word.push('=');
-
-            flush_token(word, tokens, *line_number, i);
-            chars.next();
-            continue;
-        }
-        
-        if c == ' ' {
-            flush_token(word, tokens, *line_number, i);
-            continue;
+        if state == 0 {
+            state = identify_state(&c);
         }
 
-        if TERMINAL_CHARACTERS.contains(&c) {
-            flush_token(word, tokens, *line_number, i);
-            word.push(c);
-            flush_token(word, tokens, *line_number, i);
-            continue;
+        if state == 1 {
+            process_string(&mut chars, tokens);
         }
-
-        word.push(c);
     }
 
     flush_token(word, tokens, *line_number, i);
+}
+
+fn identify_state(c: &char) -> i8 {
+    if *c == '"' {
+        return 1
+    } else if is_number(&c) {
+        return 2
+    } else {
+        return 3
+    }
+}
+
+fn process_string(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+    let mut open_string = false;
+    let mut string_value: String = String::new();
+
+    while let Some(c) = chars.next() {
+        // Start of string
+        if c == '"' && !open_string {
+            open_string = true;
+            continue;
+        }
+
+        // End of string
+        if c == '"' && open_string {
+            let new_token = Token::new(
+                "STRING".to_string(),
+                Some(string_value),
+                0,
+                0,
+            );
+
+            tokens.push(new_token);
+            return;
+        }
+
+        string_value.push(c);
+    }
+
+    // ! generate string token error
 }
 
 fn flush_token(word: &mut String, tokens: &mut Vec<Token>, line_number: i32, column_number: usize) {
