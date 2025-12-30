@@ -105,7 +105,7 @@ pub fn get_tokens(source_code_content: &mut BufReader<File>) {
     write_tokens_to_file(&tokens);
 }
 
-// TODO adicionar ILLEGAL e IDENT
+// TODO adicionar IDENT
 fn read_line(
     line: &String,
     tokens: &mut Vec<Token>,
@@ -117,6 +117,7 @@ fn read_line(
 
     while let Some(c) = chars.next() {
         i += 1;
+
         /* != and == especial case */
         if (c == '!' || c == '=') && let Some('=') = chars.peek() {
             flush_token(word, tokens, *line_number, i);
@@ -141,13 +142,6 @@ fn read_line(
             continue;
         }
 
-        if is_number(&c) {
-            let mut number_value = String::new();
-            compute_numbers(c, &mut chars, &mut number_value, tokens, *line_number, i);
-            continue;
-        }
-
-        chars.next();
         word.push(c);
     }
 
@@ -156,6 +150,19 @@ fn read_line(
 
 fn flush_token(word: &mut String, tokens: &mut Vec<Token>, line_number: i32, column_number: usize) {
     if word.is_empty() {
+        return;
+    }
+
+    // Check if is a number
+    if word.chars().all(|c| DIGITS.contains(&c)) {
+        let new_token = Token::new(
+            String::from("NUMBER"),
+            Some(word.clone()),
+            line_number,
+            column_number as i32 + 1,
+        );
+        tokens.push(new_token);
+        word.clear();
         return;
     }
 
@@ -175,37 +182,6 @@ fn flush_token(word: &mut String, tokens: &mut Vec<Token>, line_number: i32, col
     word.clear();
 }
 
-
-
-fn compute_numbers(
-    c: char,
-    chars: &mut Peekable<Chars>,
-    value: &mut String,
-    tokens: &mut Vec<Token>,
-    line_number: i32,
-    column_number: usize,
-) {
-    // The current word is not a number
-    if !is_number(&c) && value.is_empty() {
-        return;
-    }
-
-    // The current word is not a number anymore
-    if !is_number(&c) {
-        flush_token(value, tokens, line_number, column_number);
-        return;
-    }
-
-    value.push(c);
-    
-    // Consume next character if it's a digit
-    if let Some(next_char) = chars.next() {
-        compute_numbers(next_char, chars, value, tokens, line_number, column_number);
-    } else {
-        flush_token(value, tokens, line_number, column_number);
-    }
-}
-
 fn insert_end_line_token(tokens: &mut Vec<Token>, line_number: i32) {
     let new_token = Token::new(
         String::from("END_LINE"),
@@ -215,8 +191,6 @@ fn insert_end_line_token(tokens: &mut Vec<Token>, line_number: i32) {
     );
     tokens.push(new_token);
 }
-
-
 
 fn write_tokens_to_file(tokens: &Vec<Token>) {
     let path = "build/lexical.txt";
@@ -232,6 +206,19 @@ fn write_tokens_to_file(tokens: &Vec<Token>) {
         if item.token == "END_LINE" {
             writeln!(file)
                 .expect("Não foi possível escrever quebra de linha");
+            continue;
+        }
+
+        if item.value.is_some() {
+            write!(
+                file,
+                "{}|{}({}:{})",
+                item.token,
+                item.value.as_ref().unwrap(),
+                item.line,
+                item.column
+            )
+            .expect("Não foi possível escrever saída do lexer");
             continue;
         }
 
