@@ -125,13 +125,24 @@ fn read_line(
     while let Some(c) = chars.peek() {
         i += 1;
 
+        if *c == ' ' {
+            chars.next();
+            continue;
+        }
+
         if state == 0 {
             state = identify_state(&c);
         }
 
         if state == 1 {
             process_string(&mut chars, tokens);
+        } else if state == 2 {
+            process_number(&mut chars, tokens);
+        } else if state == 3 {
+
         }
+
+        state = 0
     }
 
     flush_token(word, tokens, *line_number, i);
@@ -160,14 +171,7 @@ fn process_string(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
 
         // End of string
         if c == '"' && open_string {
-            let new_token = Token::new(
-                "STRING".to_string(),
-                Some(string_value),
-                0,
-                0,
-            );
-
-            tokens.push(new_token);
+            create_token("STRING", Some(string_value), 0, 0, tokens);
             return;
         }
 
@@ -175,6 +179,22 @@ fn process_string(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
     }
 
     // ! generate string token error
+}
+
+fn process_number(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+    let mut string_value: String = String::new();
+
+    while let Some(c) = chars.peek() {
+        if is_number(&c) {
+            let c = chars.next().unwrap();
+            string_value.push(c);
+        } else {
+            create_token("NUMBER", Some(string_value), 0, 0, tokens);
+            return;
+        }
+    }
+
+    create_token("NUMBER", Some(string_value), 0, 0, tokens);
 }
 
 fn flush_token(word: &mut String, tokens: &mut Vec<Token>, line_number: i32, column_number: usize) {
@@ -265,4 +285,15 @@ fn write_tokens_to_file(tokens: &Vec<Token>) {
 // Useful functions 
 fn is_number(c: &char) -> bool {
     DIGITS.contains(c)
+}
+
+fn create_token(token: &str, value: Option<String>, line: i32, column: i32, tokens: &mut Vec<Token>) {
+    let new_token = Token::new(
+        token.to_string(),
+        value,
+        line,
+        column,
+    );
+
+    tokens.push(new_token);
 }
