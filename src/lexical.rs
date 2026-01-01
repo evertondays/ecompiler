@@ -44,12 +44,13 @@ lazy_static! {
         tokens_table.insert(String::from("{"), String::from("LBRACE"));
         tokens_table.insert(String::from("}"), String::from("RBRACE"));
 
-        tokens_table.insert(String::from("for"), String::from("RBRACE"));
+        tokens_table.insert(String::from("for"), String::from("FOR"));
         tokens_table.insert(String::from("if"), String::from("IF"));
         tokens_table.insert(String::from("else"), String::from("ELSE"));
         tokens_table.insert(String::from("int"), String::from("INT"));
         tokens_table.insert(String::from("bool"), String::from("BOOL"));
         tokens_table.insert(String::from("function"), String::from("FUNCTION"));
+        tokens_table.insert(String::from("return"), String::from("RETURN"));
         tokens_table
     };
 
@@ -68,6 +69,17 @@ lazy_static! {
         terminal_characters.insert('}');
         terminal_characters.insert(' ');
         terminal_characters
+    };
+
+    static ref VALID_IDENTIFIER_CHARS: HashSet<char> = {
+        let mut valid_chars = HashSet::new();
+        // Adicionar letras minúsculas (a-z)
+        for c in 'a'..='z' {
+            valid_chars.insert(c);
+        }
+        // Adicionar underscore
+        valid_chars.insert('_');
+        valid_chars
     };
 }
 
@@ -152,14 +164,11 @@ fn read_line(
         } else if state == 3 {
             process_terminal_char(&mut chars, tokens);
         } else {
-            // process_word(&mut chars, tokens);
-            chars.next();
+            process_word(&mut chars, tokens);
         }
 
         state = 0
     }
-
-    flush_token(word, tokens, *line_number, i);
 }
 
 fn identify_state(c: &char) -> i8 {
@@ -194,7 +203,7 @@ fn process_string(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
         string_value.push(c);
     }
 
-    // ! generate string token error
+    create_token("ILLEGAL", Some(string_value), 0, 0, tokens);
 }
 
 fn process_number(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
@@ -208,9 +217,8 @@ fn process_number(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
             create_token("NUMBER", Some(string_value), 0, 0, tokens);
             return;
         } else {
-            let c = chars.next().unwrap();
-            string_value.push(c);
-            // create_invalid_token()
+            create_illegal_token(&mut string_value, chars, tokens, 0, 0);
+            return;
         }
     }
     // ! new line - tem que resolver isso depois de mexer no buffer
@@ -228,31 +236,43 @@ fn process_terminal_char(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
         let next_char = chars.next().unwrap(); // is '='
         word.push(next_char);
 
-        flush_token(&mut word, tokens, 0, 0);
+        identify_and_create_token(word, tokens, 0, 0);
         return;
     }
 
-    flush_token(&mut word, tokens, 0, 0);
+    identify_and_create_token(word, tokens, 0, 0);
 }
 
 // TODO adicionar IDENT
 fn process_word(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
     let mut word: String = String::new();
 
-    // TODO != and == especial case
-
     while let Some(c) = chars.peek() {
+        if is_terminal_char(&c) {
+            identify_and_create_token(word, tokens, 0, 0);
+            return;
+        }
+
+        if !is_valid_char(&c) && !is_number(&c) {
+            create_illegal_token(&mut word, chars, tokens, 0, 0);
+            return;
+        }
+
+        word.push(chars.next().unwrap());
     }
+
+    identify_and_create_token(word, tokens, 0, 0);
 }
 
-fn flush_token(word: &mut String, tokens: &mut Vec<Token>, line_number: i32, column_number: usize) {
+// TODO pass value to ident
+fn identify_and_create_token(word: String, tokens: &mut Vec<Token>, line_number: i32, column_number: usize) {
     if word.is_empty() {
         return;
     }
 
-    let token = match TOKENS_TABLE.get(word) {
+    let token = match TOKENS_TABLE.get(&word) {
         Some(token) => token.clone(),
-        None => "ILLEGAL".to_string(),
+        None => "IDENT".to_string(),
     };
 
     let new_token = Token::new(
@@ -263,7 +283,6 @@ fn flush_token(word: &mut String, tokens: &mut Vec<Token>, line_number: i32, col
     );
 
     tokens.push(new_token);
-    word.clear();
 }
 
 fn write_tokens_to_file(tokens: &Vec<Token>) {
@@ -307,6 +326,18 @@ fn write_tokens_to_file(tokens: &Vec<Token>) {
     }
 }
 
+fn create_illegal_token(word: &mut String, chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>, line_number: i32, column_number: usize) {
+    while let Some(c) = chars.next() {
+        if is_terminal_char(&c) {
+            create_token("ILLEGAL", Some(word.clone()), 0, 0, tokens);
+            return;
+        }
+
+        word.push(c);
+    }
+    create_token("ILLEGAL", Some(word.clone()), 0, 0, tokens);
+}
+
 // Useful functions 
 fn is_number(c: &char) -> bool {
     DIGITS.contains(c)
@@ -314,6 +345,10 @@ fn is_number(c: &char) -> bool {
 
 fn is_terminal_char(c: &char) -> bool {
     TERMINAL_CHARACTERS.contains(c)
+}
+
+fn is_valid_char(c: &char) -> bool {
+    VALID_IDENTIFIER_CHARS.contains(c)
 }
 
 fn create_token(token: &str, value: Option<String>, line: i32, column: i32, tokens: &mut Vec<Token>) {
@@ -326,10 +361,6 @@ fn create_token(token: &str, value: Option<String>, line: i32, column: i32, toke
 
     tokens.push(new_token);
 }
-
-// fn create_invalid_token(token: &str, value: Option<String>, line: i32, column: i32, tokens: &mut Vec<Token>) {
-
-// }
 
 fn insert_end_line_token(tokens: &mut Vec<Token>, line_number: i32) {
     let new_token = Token::new(
