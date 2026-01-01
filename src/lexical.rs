@@ -9,6 +9,12 @@ use std::str::Chars;
 use std::iter::Peekable;
 use lazy_static::lazy_static;
 
+const UNKNOWN_STATE: i8 = 0;
+const STRING_STATE: i8 = 1;
+const NUMBER_STATE: i8 = 2;
+const TERMINAL_CHARACTER_STATE: i8 = 3; // symbols like ==, !, {
+const WORD_CHARACTER_STATE: i8 = 4; // variables or keywords
+
 lazy_static! {
     static ref DIGITS: HashSet<char> = {
         let mut digits = HashSet::new();
@@ -73,11 +79,9 @@ lazy_static! {
 
     static ref VALID_IDENTIFIER_CHARS: HashSet<char> = {
         let mut valid_chars = HashSet::new();
-        // Adicionar letras minúsculas (a-z)
         for c in 'a'..='z' {
             valid_chars.insert(c);
         }
-        // Adicionar underscore
         valid_chars.insert('_');
         valid_chars
     };
@@ -108,13 +112,12 @@ impl Token {
 
 pub fn get_tokens(source_code_content: &mut BufReader<File>) {
     let mut tokens: Vec<Token> = Vec::new();
-    let mut word: String = String::new();
 
     let mut line_number: i32 = 1;
     
     for line in source_code_content.lines() {
         match line {
-            Ok(content) => read_line(&content, &mut tokens, &mut word, &line_number),
+            Ok(content) => read_line(&content, &mut tokens),
             Err(err) => {
                 eprintln!("Erro ao ler linha {}: {}", line_number, err);
                 process::exit(1);
@@ -130,24 +133,13 @@ pub fn get_tokens(source_code_content: &mut BufReader<File>) {
 
 fn read_line(
     line: &String,
-    tokens: &mut Vec<Token>,
-    word: &mut String,
-    line_number: &i32,
+    tokens: &mut Vec<Token>
 ) {
-    let mut state: i8 = 0;
-
-    // 0 - Unknown token
-    // 1 - String
-    // 2 - Number
-    // 3 - Terminal character
-    // 4 - Word (variables or keywords)
+    let mut state: i8 = UNKNOWN_STATE;
 
     let mut chars = line.chars().peekable();
-    let mut i: usize = 0;
 
     while let Some(c) = chars.peek() {
-        i += 1;
-
         if *c == ' ' {
             chars.next();
             continue;
@@ -157,29 +149,29 @@ fn read_line(
             state = identify_state(&c);
         }
 
-        if state == 1 {
+        if state == STRING_STATE {
             process_string(&mut chars, tokens);
-        } else if state == 2 {
+        } else if state == NUMBER_STATE {
             process_number(&mut chars, tokens);
-        } else if state == 3 {
+        } else if state == TERMINAL_CHARACTER_STATE {
             process_terminal_char(&mut chars, tokens);
         } else {
             process_word(&mut chars, tokens);
         }
 
-        state = 0
+        state = UNKNOWN_STATE
     }
 }
 
 fn identify_state(c: &char) -> i8 {
     if *c == '"' {
-        return 1
+        return STRING_STATE
     } else if is_number(&c) {
-        return 2
+        return NUMBER_STATE
     } else if is_terminal_char(&c) {
-        return 3
+        return TERMINAL_CHARACTER_STATE
     } else {
-        return 4
+        return WORD_CHARACTER_STATE
     }
 }
 
@@ -243,7 +235,6 @@ fn process_terminal_char(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
     identify_and_create_token(word, tokens, 0, 0);
 }
 
-// TODO adicionar IDENT
 fn process_word(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
     let mut word: String = String::new();
 
@@ -305,7 +296,7 @@ fn write_tokens_to_file(tokens: &Vec<Token>) {
         if item.value.is_some() {
             write!(
                 file,
-                "{}|{}({}:{})",
+                "{}|{}({}:{}) ",
                 item.token,
                 item.value.as_ref().unwrap(),
                 item.line,
@@ -317,7 +308,7 @@ fn write_tokens_to_file(tokens: &Vec<Token>) {
 
         write!(
             file,
-            "{}({}:{})",
+            "{}({}:{}) ",
             item.token,
             item.line,
             item.column
