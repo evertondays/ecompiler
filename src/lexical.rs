@@ -1,13 +1,13 @@
-use std::fs::File;
-use std::io::{BufReader, Write};
-use std::io::BufRead;
-use std::process;
-use std::fs;
+use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::str::Chars;
+use std::fs;
+use std::fs::File;
+use std::io::BufRead;
+use std::io::{BufReader, Write};
 use std::iter::Peekable;
-use lazy_static::lazy_static;
+use std::process;
+use std::str::Chars;
 
 const UNKNOWN_STATE: i8 = 0;
 const STRING_STATE: i8 = 1;
@@ -30,12 +30,11 @@ lazy_static! {
         digits.insert('9');
         digits
     };
-
     static ref TOKENS_TABLE: HashMap<String, String> = {
         let mut tokens_table = HashMap::new();
         tokens_table.insert(String::from(":"), String::from("COLON"));
         tokens_table.insert(String::from("="), String::from("ASSIGN"));
-        
+
         tokens_table.insert(String::from("+"), String::from("PLUS"));
         tokens_table.insert(String::from("-"), String::from("MINUS"));
         tokens_table.insert(String::from("*"), String::from("ASTERISK"));
@@ -59,7 +58,6 @@ lazy_static! {
         tokens_table.insert(String::from("return"), String::from("RETURN"));
         tokens_table
     };
-
     static ref TERMINAL_CHARACTERS: HashSet<char> = {
         let mut terminal_characters = HashSet::new();
         terminal_characters.insert(':');
@@ -76,7 +74,6 @@ lazy_static! {
         terminal_characters.insert(' ');
         terminal_characters
     };
-
     static ref VALID_IDENTIFIER_CHARS: HashSet<char> = {
         let mut valid_chars = HashSet::new();
         for c in 'a'..='z' {
@@ -95,12 +92,7 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(
-        token: String,
-        value: Option<String>,
-        line: i32,
-        column: i32,
-    ) -> Self {
+    pub fn new(token: String, value: Option<String>, line: i32, column: i32) -> Self {
         Self {
             token,
             value,
@@ -114,7 +106,7 @@ pub fn get_tokens(source_code_content: &mut BufReader<File>) {
     let mut tokens: Vec<Token> = Vec::new();
 
     let mut line_number: i32 = 1;
-    
+
     for line in source_code_content.lines() {
         match line {
             Ok(content) => read_line(&content, &mut tokens),
@@ -131,10 +123,7 @@ pub fn get_tokens(source_code_content: &mut BufReader<File>) {
     write_tokens_to_file(&tokens);
 }
 
-fn read_line(
-    line: &String,
-    tokens: &mut Vec<Token>
-) {
+fn read_line(line: &String, tokens: &mut Vec<Token>) {
     let mut state: i8 = UNKNOWN_STATE;
 
     let mut chars = line.chars().peekable();
@@ -165,13 +154,13 @@ fn read_line(
 
 fn identify_state(c: &char) -> i8 {
     if *c == '"' {
-        return STRING_STATE
+        return STRING_STATE;
     } else if is_number(&c) {
-        return NUMBER_STATE
+        return NUMBER_STATE;
     } else if is_terminal_char(&c) {
-        return TERMINAL_CHARACTER_STATE
+        return TERMINAL_CHARACTER_STATE;
     } else {
-        return WORD_CHARACTER_STATE
+        return WORD_CHARACTER_STATE;
     }
 }
 
@@ -224,11 +213,13 @@ fn process_terminal_char(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
     word.push(c);
 
     /* != and == especial case */
-    if (c == '!' || c == '=') && let Some('=') = chars.peek() {
+    if (c == '!' || c == '=')
+        && let Some('=') = chars.peek()
+    {
         let next_char = chars.next().unwrap(); // is '='
         word.push(next_char);
 
-        identify_and_create_token(word, tokens, 0, 0);
+        identify_and_create_token(word.clone(), tokens, 0, 0);
         return;
     }
 
@@ -236,7 +227,7 @@ fn process_terminal_char(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
 }
 
 fn process_word(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
-    let mut word: String = String::new();
+    let mut word = String::new();
 
     while let Some(c) = chars.peek() {
         if is_terminal_char(&c) {
@@ -255,8 +246,12 @@ fn process_word(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
     identify_and_create_token(word, tokens, 0, 0);
 }
 
-// TODO pass value to ident
-fn identify_and_create_token(word: String, tokens: &mut Vec<Token>, line_number: i32, column_number: usize) {
+fn identify_and_create_token(
+    word: String,
+    tokens: &mut Vec<Token>,
+    line_number: i32,
+    column_number: usize
+) {
     if word.is_empty() {
         return;
     }
@@ -266,12 +261,12 @@ fn identify_and_create_token(word: String, tokens: &mut Vec<Token>, line_number:
         None => "IDENT".to_string(),
     };
 
-    let new_token = Token::new(
-        token,
-        None,
-        line_number,
-        column_number as i32 + 1,
-    );
+    let mut value: Option<String> = None;
+    if token == "IDENT" {
+        value = Some(word.clone());
+    }
+
+    let new_token = Token::new(token, value, line_number, column_number as i32 + 1);
 
     tokens.push(new_token);
 }
@@ -288,8 +283,7 @@ fn write_tokens_to_file(tokens: &Vec<Token>) {
 
     for item in tokens {
         if item.token == "END_LINE" {
-            writeln!(file)
-                .expect("Não foi possível escrever quebra de linha");
+            writeln!(file).expect("Não foi possível escrever quebra de linha");
             continue;
         }
 
@@ -306,18 +300,18 @@ fn write_tokens_to_file(tokens: &Vec<Token>) {
             continue;
         }
 
-        write!(
-            file,
-            "{}({}:{}) ",
-            item.token,
-            item.line,
-            item.column
-        )
-        .expect("Não foi possível escrever saída do lexer");
+        write!(file, "{}({}:{}) ", item.token, item.line, item.column)
+            .expect("Não foi possível escrever saída do lexer");
     }
 }
 
-fn create_illegal_token(word: &mut String, chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>, line_number: i32, column_number: usize) {
+fn create_illegal_token(
+    word: &mut String,
+    chars: &mut Peekable<Chars>,
+    tokens: &mut Vec<Token>,
+    line_number: i32,
+    column_number: usize,
+) {
     while let Some(c) = chars.next() {
         if is_terminal_char(&c) {
             create_token("ILLEGAL", Some(word.clone()), 0, 0, tokens);
@@ -329,7 +323,7 @@ fn create_illegal_token(word: &mut String, chars: &mut Peekable<Chars>, tokens: 
     create_token("ILLEGAL", Some(word.clone()), 0, 0, tokens);
 }
 
-// Useful functions 
+// Useful functions
 fn is_number(c: &char) -> bool {
     DIGITS.contains(c)
 }
@@ -342,23 +336,19 @@ fn is_valid_char(c: &char) -> bool {
     VALID_IDENTIFIER_CHARS.contains(c)
 }
 
-fn create_token(token: &str, value: Option<String>, line: i32, column: i32, tokens: &mut Vec<Token>) {
-    let new_token = Token::new(
-        token.to_string(),
-        value,
-        line,
-        column,
-    );
+fn create_token(
+    token: &str,
+    value: Option<String>,
+    line: i32,
+    column: i32,
+    tokens: &mut Vec<Token>,
+) {
+    let new_token = Token::new(token.to_string(), value, line, column);
 
     tokens.push(new_token);
 }
 
 fn insert_end_line_token(tokens: &mut Vec<Token>, line_number: i32) {
-    let new_token = Token::new(
-        String::from("END_LINE"),
-        None,   
-        line_number,
-        0,
-    );
+    let new_token = Token::new(String::from("END_LINE"), None, line_number, 0);
     tokens.push(new_token);
 }
