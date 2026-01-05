@@ -18,6 +18,7 @@ fn main() {
 
     println!("Iniciando análise léxica . . .");
     lexical::get_tokens(&mut source_code_reader);
+    println!("Análise léxica ✅");
 }
 
 fn get_source_code_path() -> String {
