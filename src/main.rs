@@ -1,9 +1,10 @@
-use std::fs::File;
-use std::io::{BufReader};
-use std::process;
 use clap::Parser;
+use std::fs::File;
+use std::io::BufReader;
+use std::process;
 
 mod lexical;
+mod parser;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -17,8 +18,12 @@ fn main() {
     let mut source_code_reader = open_source_code_file(&path);
 
     println!("Iniciando análise léxica . . .");
-    lexical::get_tokens(&mut source_code_reader);
+    let mut tokens: Vec<lexical::Token> = lexical::get_tokens(&mut source_code_reader);
     println!("Análise léxica ✅");
+
+    println!("Iniciando análise sintática . . .");
+    parser::codegen(&mut tokens);
+    println!("Análise sintática ✅");
 }
 
 fn get_source_code_path() -> String {
@@ -30,7 +35,7 @@ fn get_source_code_path() -> String {
             eprintln!("É necessário passar o diretório do arquivo de código fonte");
             eprintln!("Exemplo: --path \"./teste.e\"");
             process::exit(1);
-        },
+        }
     }
 }
 
@@ -38,11 +43,14 @@ fn open_source_code_file(path: &str) -> BufReader<File> {
     let file = File::open(path);
 
     match file {
-        Ok (content) => {
+        Ok(content) => {
             return BufReader::new(content);
         }
         Err(err) => {
-            eprintln!("Erro ao ler arquivo!\nArquivo não encontrado em {}\nA extensão do arquivo esperado é '.e'\nMais detalhes: {}", path, err);
+            eprintln!(
+                "Erro ao ler arquivo!\nArquivo não encontrado em {}\nA extensão do arquivo esperado é '.e'\nMais detalhes: {}",
+                path, err
+            );
             process::exit(1);
         }
     }

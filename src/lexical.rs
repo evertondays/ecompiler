@@ -102,7 +102,7 @@ impl Token {
     }
 }
 
-pub fn get_tokens(source_code_content: &mut BufReader<File>) {
+pub fn get_tokens(source_code_content: &mut BufReader<File>) -> Vec<Token> {
     let mut tokens: Vec<Token> = Vec::new();
 
     let mut line_number: i32 = 1;
@@ -121,6 +121,8 @@ pub fn get_tokens(source_code_content: &mut BufReader<File>) {
     }
 
     write_tokens_to_file(&tokens);
+
+    return tokens;
 }
 
 fn read_line(line: &String, tokens: &mut Vec<Token>) {
